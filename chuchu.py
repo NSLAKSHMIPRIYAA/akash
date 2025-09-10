@@ -3,20 +3,21 @@ from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# ===== CONFIG =====
+# ====== CONFIG ======
 USERS = {
     "akash": "akash123",
     "admin": "admin123"
 }
 
-# ===== FIREBASE SETUP =====
-cred = credentials.Certificate("firebase_credentials.json")  # upload your Firebase JSON
+# ====== FIREBASE SETUP ======
+cred = credentials.Certificate("akash-d7c13-firebase-adminsdk-fbsvc-d358f0d9a8.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 messages_ref = db.collection("messages")
 
-# ===== FUNCTIONS =====
+# ====== FUNCTIONS ======
 def send_message(sender, message):
+    """Send a new message to Firestore."""
     messages_ref.add({
         "sender": sender,
         "message": message,
@@ -25,11 +26,13 @@ def send_message(sender, message):
     })
 
 def respond_message(doc_id, response):
+    """Send a response to a message in Firestore."""
     messages_ref.document(doc_id).update({
         "response": response
     })
 
 def get_messages():
+    """Fetch all messages ordered by timestamp."""
     docs = messages_ref.order_by("timestamp").stream()
     msgs = []
     for doc in docs:
@@ -38,10 +41,10 @@ def get_messages():
         msgs.append(data)
     return msgs
 
-# ===== MAIN APP =====
+# ====== MAIN APP ======
 st.title("💙 Akash & Priyaa's Portal")
 
-# --- Login ---
+# --- LOGIN ---
 st.sidebar.header("Login")
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
@@ -50,45 +53,44 @@ login = st.sidebar.button("Login")
 if login:
     if username in USERS and USERS[username] == password:
         st.success(f"Welcome, {username}!")
-        
+
         messages = get_messages()
-        
-        # --- Akash Portal ---
+
+        # ----- Akash Portal -----
         if username == "akash":
-            st.subheader("Send Your Feelings")
+            st.subheader("💌 Send Your Feelings")
             feeling = st.text_area("Type your feelings here...")
             if st.button("Send"):
                 if feeling.strip():
                     send_message("akash", feeling)
-                    st.success("Sent!")
+                    st.success("Message sent!")
                 else:
-                    st.warning("Type something first.")
+                    st.warning("Please type something first.")
 
-            st.subheader("Previous Conversations")
+            st.subheader("📜 Previous Conversations")
             for msg in messages:
                 if msg["sender"] == "akash":
-                    st.markdown(f"**You:** {msg['message']}")
+                    st.markdown(f"<p style='color:blue'><b>You:</b> {msg['message']}</p>", unsafe_allow_html=True)
                     if msg["response"]:
-                        st.markdown(f"💌 Response: {msg['response']}")
+                        st.markdown(f"<p style='color:green'><b>Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
                     st.markdown(f"*Sent at: {msg['timestamp']}*")
                     st.write("---")
-        
-        # --- Admin Portal ---
+
+        # ----- Admin Portal -----
         elif username == "admin":
-            st.subheader("All Messages")
+            st.subheader("📜 All Messages from Akash")
             for msg in messages:
                 if msg["sender"] == "akash":
-                    st.markdown(f"**Akash:** {msg['message']}")
+                    st.markdown(f"<p style='color:blue'><b>Akash:</b> {msg['message']}</p>", unsafe_allow_html=True)
                     if msg["response"]:
-                        st.markdown(f"💌 Your Response: {msg['response']}")
+                        st.markdown(f"<p style='color:green'><b>Your Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
                     else:
                         reply = st.text_area(f"Reply to this message", key=msg["id"])
                         if st.button("Send Reply", key=f"btn_{msg['id']}"):
                             if reply.strip():
                                 respond_message(msg["id"], reply)
-                                st.success("Responded!")
+                                st.success("Response sent!")
                     st.markdown(f"*Sent at: {msg['timestamp']}*")
                     st.write("---")
     else:
-        st.error("Invalid username or password!")
-
+        st.error("❌ Invalid username or password!")
