@@ -65,11 +65,18 @@ if login:
         # ----- Akash Portal -----
         if username == "akash":
             st.subheader("💌 Send Your Feelings")
-            feeling = st.text_area("Type your feelings here...")
+
+            # Session state for text area
+            if "feeling" not in st.session_state:
+                st.session_state.feeling = ""
+                
+            st.session_state.feeling = st.text_area("Type your feelings here...", value=st.session_state.feeling)
+
             if st.button("Send"):
-                if feeling.strip():
-                    send_message("akash", feeling)
+                if st.session_state.feeling.strip():
+                    send_message("akash", st.session_state.feeling)
                     st.success("Message sent!")
+                    st.session_state.feeling = ""  # Clear text area
                 else:
                     st.warning("Please type something first.")
 
