@@ -1,30 +1,47 @@
 import streamlit as st
-import pandas as pd
-import os
 from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-# ====== CONFIG ======
+# ===== CONFIG =====
 USERS = {
-    "akash": "akash123",   # Akash's login
-    "admin": "admin123"    # Your login
+    "akash": "akash123",
+    "admin": "admin123"
 }
 
-DATA_FILE = "grievances.csv"
+# ===== FIREBASE SETUP =====
+cred = credentials.Certificate("firebase_credentials.json")  # upload your Firebase JSON
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+messages_ref = db.collection("messages")
 
-# ====== FUNCTIONS ======
-def load_data():
-    if os.path.exists(DATA_FILE):
-        return pd.read_csv(DATA_FILE)
-    else:
-        return pd.DataFrame(columns=["id", "user", "message", "response", "status", "timestamp"])
+# ===== FUNCTIONS =====
+def send_message(sender, message):
+    messages_ref.add({
+        "sender": sender,
+        "message": message,
+        "response": "",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
+def respond_message(doc_id, response):
+    messages_ref.document(doc_id).update({
+        "response": response
+    })
 
-# ====== MAIN ======
-st.title("💙 Akash & Priyaa's Grievance Portal")
+def get_messages():
+    docs = messages_ref.order_by("timestamp").stream()
+    msgs = []
+    for doc in docs:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        msgs.append(data)
+    return msgs
 
-# Login form
+# ===== MAIN APP =====
+st.title("💙 Akash & Priyaa's Portal")
+
+# --- Login ---
 st.sidebar.header("Login")
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
@@ -33,62 +50,44 @@ login = st.sidebar.button("Login")
 if login:
     if username in USERS and USERS[username] == password:
         st.success(f"Welcome, {username}!")
-
-        df = load_data()
-
-        # ----- Akash's Portal -----
+        
+        messages = get_messages()
+        
+        # --- Akash Portal ---
         if username == "akash":
-            st.subheader("Submit a Grievance")
-            grievance = st.text_area("Write your grievance here:")
-            if st.button("Submit"):
-                if grievance.strip():
-                    new_id = len(df) + 1
-                    new_entry = {
-                        "id": new_id,
-                        "user": "akash",
-                        "message": grievance,
-                        "response": "",
-                        "status": "Pending",
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                    save_data(df)
-                    st.success("Grievance submitted successfully!")
+            st.subheader("Send Your Feelings")
+            feeling = st.text_area("Type your feelings here...")
+            if st.button("Send"):
+                if feeling.strip():
+                    send_message("akash", feeling)
+                    st.success("Sent!")
                 else:
-                    st.warning("Please enter a grievance before submitting.")
+                    st.warning("Type something first.")
 
-            st.subheader("Your Grievances & Responses")
-            akash_data = df[df["user"] == "akash"]
-            if not akash_data.empty:
-                for _, row in akash_data.iterrows():
-                    st.markdown(f"**Message:** {row['message']}")
-                    st.markdown(f"📌 Status: {row['status']}")
-                    if row['response']:
-                        st.markdown(f"💌 Response: {row['response']}")
+            st.subheader("Previous Conversations")
+            for msg in messages:
+                if msg["sender"] == "akash":
+                    st.markdown(f"**You:** {msg['message']}")
+                    if msg["response"]:
+                        st.markdown(f"💌 Response: {msg['response']}")
+                    st.markdown(f"*Sent at: {msg['timestamp']}*")
                     st.write("---")
-            else:
-                st.info("No grievances yet.")
-
-        # ----- Admin's Portal -----
+        
+        # --- Admin Portal ---
         elif username == "admin":
-            st.subheader("All Grievances")
-            if not df.empty:
-                for idx, row in df.iterrows():
-                    st.markdown(f"**From Akash:** {row['message']}")
-                    st.markdown(f"📌 Status: {row['status']}")
-                    if row['response']:
-                        st.markdown(f"💌 Your Response: {row['response']}")
+            st.subheader("All Messages")
+            for msg in messages:
+                if msg["sender"] == "akash":
+                    st.markdown(f"**Akash:** {msg['message']}")
+                    if msg["response"]:
+                        st.markdown(f"💌 Your Response: {msg['response']}")
                     else:
-                        reply = st.text_area(f"Reply to grievance #{row['id']}", key=f"reply_{row['id']}")
-                        if st.button(f"Send Reply #{row['id']}", key=f"btn_{row['id']}"):
-                            df.at[idx, "response"] = reply
-                            df.at[idx, "status"] = "Responded"
-                            save_data(df)
-                            st.success("Response sent!")
+                        reply = st.text_area(f"Reply to this message", key=msg["id"])
+                        if st.button("Send Reply", key=f"btn_{msg['id']}"):
+                            if reply.strip():
+                                respond_message(msg["id"], reply)
+                                st.success("Responded!")
+                    st.markdown(f"*Sent at: {msg['timestamp']}*")
                     st.write("---")
-            else:
-                st.info("No grievances submitted yet.")
-
     else:
         st.error("Invalid username or password!")
-
