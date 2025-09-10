@@ -78,7 +78,7 @@ else:
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user = ""
-        st.experimental_rerun()
+        st.rerun()
 
     # --- Fetch Messages ---
     messages = get_messages()
@@ -100,7 +100,7 @@ else:
                 send_message("akash", st.session_state.feeling)
                 st.success("Message sent!")
                 st.session_state.feeling = ""  # Clear text area
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Please type something first.")
 
@@ -127,6 +127,6 @@ else:
                         if reply.strip():
                             respond_message(msg["id"], reply)
                             st.success("Response sent!")
-                            st.experimental_rerun()
+                            st.rerun()
                 st.markdown(f"*Sent at: {msg['timestamp']}*")
                 st.write("---")
