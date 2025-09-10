@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import firebase_admin
-from firebase_admin import credentials, firestore
 
 # ====== CONFIG ======
 USERS = {
@@ -11,7 +11,13 @@ USERS = {
 
 # ====== FIREBASE SETUP ======
 cred = credentials.Certificate("akash-d7c13-firebase-adminsdk-fbsvc-d358f0d9a8.json")
-firebase_admin.initialize_app(cred)
+
+# Initialize Firebase only if not already initialized
+try:
+    app = get_app()
+except ValueError:
+    app = initialize_app(cred)
+
 db = firestore.client()
 messages_ref = db.collection("messages")
 
