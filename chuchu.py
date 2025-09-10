@@ -47,63 +47,86 @@ def get_messages():
         msgs.append(data)
     return msgs
 
+
 # ====== MAIN APP ======
 st.title("💙 Akash & Priyaa's Portal")
 
-# --- LOGIN ---
+# --- SESSION STATE FOR LOGIN ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user = ""
+
+# --- LOGIN FORM ---
 st.sidebar.header("Login")
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
-login = st.sidebar.button("Login")
 
-if login:
-    if username in USERS and USERS[username] == password:
-        st.success(f"Welcome, {username}!")
+if not st.session_state.logged_in:
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    login = st.sidebar.button("Login")
 
-        messages = get_messages()
+    if login:
+        if username in USERS and USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.success(f"Welcome, {username}!")
+        else:
+            st.error("❌ Invalid username or password!")
 
-        # ----- Akash Portal -----
-        if username == "akash":
-            st.subheader("💌 Send Your Feelings")
+else:
+    username = st.session_state.user
+    st.sidebar.success(f"Logged in as {username}")
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.user = ""
+        st.experimental_rerun()
 
-            # Session state for text area
-            if "feeling" not in st.session_state:
-                st.session_state.feeling = ""
-                
-            st.session_state.feeling = st.text_area("Type your feelings here...", value=st.session_state.feeling)
+    # --- Fetch Messages ---
+    messages = get_messages()
 
-            if st.button("Send"):
-                if st.session_state.feeling.strip():
-                    send_message("akash", st.session_state.feeling)
-                    st.success("Message sent!")
-                    st.session_state.feeling = ""  # Clear text area
+    # ----- Akash Portal -----
+    if username == "akash":
+        st.subheader("💌 Send Your Feelings")
+
+        if "feeling" not in st.session_state:
+            st.session_state.feeling = ""
+
+        st.session_state.feeling = st.text_area(
+            "Type your feelings here...",
+            value=st.session_state.feeling
+        )
+
+        if st.button("Send"):
+            if st.session_state.feeling.strip():
+                send_message("akash", st.session_state.feeling)
+                st.success("Message sent!")
+                st.session_state.feeling = ""  # Clear text area
+                st.experimental_rerun()
+            else:
+                st.warning("Please type something first.")
+
+        st.subheader("📜 Previous Conversations")
+        for msg in messages:
+            if msg["sender"] == "akash":
+                st.markdown(f"<p style='color:blue'><b>You:</b> {msg['message']}</p>", unsafe_allow_html=True)
+                if msg["response"]:
+                    st.markdown(f"<p style='color:green'><b>Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
+                st.markdown(f"*Sent at: {msg['timestamp']}*")
+                st.write("---")
+
+    # ----- Admin Portal -----
+    elif username == "admin":
+        st.subheader("📜 All Messages from Akash")
+        for msg in messages:
+            if msg["sender"] == "akash":
+                st.markdown(f"<p style='color:blue'><b>Akash:</b> {msg['message']}</p>", unsafe_allow_html=True)
+                if msg["response"]:
+                    st.markdown(f"<p style='color:green'><b>Your Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
                 else:
-                    st.warning("Please type something first.")
-
-            st.subheader("📜 Previous Conversations")
-            for msg in messages:
-                if msg["sender"] == "akash":
-                    st.markdown(f"<p style='color:blue'><b>You:</b> {msg['message']}</p>", unsafe_allow_html=True)
-                    if msg["response"]:
-                        st.markdown(f"<p style='color:green'><b>Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
-                    st.markdown(f"*Sent at: {msg['timestamp']}*")
-                    st.write("---")
-
-        # ----- Admin Portal -----
-        elif username == "admin":
-            st.subheader("📜 All Messages from Akash")
-            for msg in messages:
-                if msg["sender"] == "akash":
-                    st.markdown(f"<p style='color:blue'><b>Akash:</b> {msg['message']}</p>", unsafe_allow_html=True)
-                    if msg["response"]:
-                        st.markdown(f"<p style='color:green'><b>Your Response:</b> {msg['response']}</p>", unsafe_allow_html=True)
-                    else:
-                        reply = st.text_area(f"Reply to this message", key=msg["id"])
-                        if st.button("Send Reply", key=f"btn_{msg['id']}"):
-                            if reply.strip():
-                                respond_message(msg["id"], reply)
-                                st.success("Response sent!")
-                    st.markdown(f"*Sent at: {msg['timestamp']}*")
-                    st.write("---")
-    else:
-        st.error("❌ Invalid username or password!")
+                    reply = st.text_area(f"Reply to this message", key=msg["id"])
+                    if st.button("Send Reply", key=f"btn_{msg['id']}"):
+                        if reply.strip():
+                            respond_message(msg["id"], reply)
+                            st.success("Response sent!")
+                            st.experimental_rerun()
+                st.markdown(f"*Sent at: {msg['timestamp']}*")
+                st.write("---")
